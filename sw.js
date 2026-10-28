@@ -1,9 +1,11 @@
-const CACHE = 'spendee-v1';
+const CACHE = 'spendee-v2';
 const FILES = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './db.js',
+  './logic.js',
   './manifest.json',
   './icon.svg'
 ];
