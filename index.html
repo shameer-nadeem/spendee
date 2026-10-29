@@ -11,7 +11,23 @@
 </head>
 <body>
 <main>
-  <section id="add" class="screen active"><h1>Add</h1></section>
+  <section id="add" class="screen active">
+    <div class="balance">
+      <span class="label">Balance</span>
+      <strong id="balance">Rs 0</strong>
+    </div>
+    <form id="form" autocomplete="off">
+      <label for="amount">Amount (PKR)</label>
+      <input id="amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">
+      <label for="note">Note</label>
+      <input id="note" type="text" placeholder="What was it for?">
+      <label>Category</label>
+      <div id="chips" class="chips"></div>
+      <label for="date">Date</label>
+      <input id="date" type="date">
+      <button type="submit" class="primary">Save</button>
+    </form>
+  </section>
   <section id="dashboard" class="screen"><h1>Dashboard</h1></section>
   <section id="owed" class="screen"><h1>Owed</h1></section>
   <section id="history" class="screen"><h1>History</h1></section>
@@ -22,6 +38,15 @@
   <button data-tab="owed">Owed</button>
   <button data-tab="history">History</button>
 </nav>
+<div id="toast" class="toast"></div>
+<div id="setup" class="setup" hidden>
+  <form id="setup-form" autocomplete="off">
+    <h1>Welcome to Spendee</h1>
+    <label for="start">Your starting balance (PKR)</label>
+    <input id="start" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">
+    <button type="submit" class="primary">Start</button>
+  </form>
+</div>
 <script type="module" src="app.js"></script>
 </body>
 </html>
