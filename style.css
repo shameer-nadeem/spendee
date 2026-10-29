@@ -282,3 +282,10 @@ h2 { margin: 24px 0 10px; font-size: 16px; color: var(--muted); font-weight: 600
 .fill { height: 100%; min-width: 4px; background: var(--accent); border-radius: 0 4px 4px 0; }
 
 .top { margin: 0; padding-left: 22px; line-height: 2; }
+
+.quick { margin-bottom: 4px; }
+.quick-row { display: flex; gap: 8px; }
+.quick-row input { flex: 1; min-width: 0; }
+.quick-row .small { min-width: 64px; }
+.parsed { margin: 10px 0 0; padding: 12px 14px; background: var(--card); border-left: 3px solid var(--accent); border-radius: 8px; white-space: pre-line; line-height: 1.5; font-size: 15px; }
+.parsed.bad { border-left-color: #f87171; color: #f87171; }

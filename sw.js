@@ -1,4 +1,4 @@
-const CACHE = 'spendee-v6';
+const CACHE = 'spendee-v7';
 const FILES = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const FILES = [
   './app.js',
   './db.js',
   './logic.js',
+  './parser.js',
   './manifest.json',
   './icon.svg'
 ];

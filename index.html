@@ -16,6 +16,14 @@
       <span class="label">Balance</span>
       <strong id="balance">Rs 0</strong>
     </div>
+    <form id="quick-form" class="quick" autocomplete="off">
+      <label for="quick">Quick entry</label>
+      <div class="quick-row">
+        <input id="quick" type="text" placeholder="lunch 6000 Ali 2000 Hamza 2500">
+        <button type="submit" class="small">Fill</button>
+      </div>
+      <p id="parsed" class="parsed" hidden></p>
+    </form>
     <form id="form" autocomplete="off">
       <label for="amount">Amount (PKR)</label>
       <input id="amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">

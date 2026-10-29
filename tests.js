@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { parseEntry } from './parser.js';
 import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, settle, monthOf, getMonths, getTotalOwed, getMonthStats } from './logic.js';
 
 let passed = 0;
@@ -197,6 +198,79 @@ test('getTotalOwed adds up pending money only', () => {
   const sp = [...splits, { id: 9, txId: 1, friend: 'Sara', amount: 100, settled: true }];
   assert.equal(getTotalOwed([lunch], sp), 4500);
   assert.equal(getTotalOwed([], sp), 0);
+});
+
+test('parser: lunch with two friends', () => {
+  const r = parseEntry('lunch 6000 Ali 2000 Hamza 2500');
+  assert.equal(r.amount, 6000);
+  assert.equal(r.category, 'Food');
+  assert.equal(r.note, 'lunch');
+  assert.deepEqual(r.friends, [{ name: 'Ali', amount: 2000 }, { name: 'Hamza', amount: 2500 }]);
+});
+
+test('parser: gym fee is a payment', () => {
+  const r = parseEntry('gym fee 8000');
+  assert.equal(r.amount, 8000);
+  assert.equal(r.category, 'Payments');
+  assert.equal(r.note, 'gym fee');
+  assert.deepEqual(r.friends, []);
+});
+
+test('parser: got paid is earning', () => {
+  const r = parseEntry('got paid 50000 freelance');
+  assert.equal(r.amount, 50000);
+  assert.equal(r.category, 'Earning');
+  assert.equal(r.note, 'got paid freelance');
+});
+
+test('parser: messy case, commas, Rs, filler words, trailing rupees', () => {
+  const r = parseEntry('  LUNCH   Rs. 6,000 with ali, 2,000 and HAMZA 2500 rupees ');
+  assert.equal(r.amount, 6000);
+  assert.equal(r.category, 'Food');
+  assert.deepEqual(r.friends, [{ name: 'Ali', amount: 2000 }, { name: 'Hamza', amount: 2500 }]);
+});
+
+test('parser: glued currency, colon names, and k suffix', () => {
+  assert.equal(parseEntry('uber Rs.450').amount, 450);
+  assert.equal(parseEntry('uber 1.5k').amount, 1500);
+  assert.equal(parseEntry('uber 2k').category, 'Transport');
+  const r = parseEntry('dinner 3000 Ali:1000');
+  assert.deepEqual(r.friends, [{ name: 'Ali', amount: 1000 }]);
+});
+
+test('parser: coffee, internet bill, unknown words', () => {
+  assert.equal(parseEntry('coffee 450').category, 'Coffee');
+  assert.equal(parseEntry('internet bill 3500').category, 'Payments');
+  assert.equal(parseEntry('icloud storage 400').category, 'Payments');
+  assert.equal(parseEntry('random thing 300').category, 'Others');
+});
+
+test('parser: extra words before a friend stay in the note', () => {
+  const r = parseEntry('dinner 5000 at KFC Ali 1000');
+  assert.equal(r.note, 'dinner at KFC');
+  assert.deepEqual(r.friends, [{ name: 'Ali', amount: 1000 }]);
+});
+
+test('parser: no amount gives an error', () => {
+  const r = parseEntry('just some words');
+  assert.equal(r.error, 'No amount found');
+  assert.equal(parseEntry('').error, 'No amount found');
+});
+
+test('parser: earning ignores friends', () => {
+  const r = parseEntry('salary 80000 Ali 100');
+  assert.equal(r.category, 'Earning');
+  assert.deepEqual(r.friends, []);
+});
+
+test('parser: friend amount with no name keeps an empty name', () => {
+  const r = parseEntry('lunch 600 200');
+  assert.deepEqual(r.friends, [{ name: '', amount: 200 }]);
+});
+
+test('parser: custom keyword rules are used', () => {
+  assert.equal(parseEntry('chai 100', { Coffee: ['chai'] }).category, 'Coffee');
+  assert.equal(parseEntry('chai 100').category, 'Others');
 });
 
 console.log('\n' + passed + ' tests passed');

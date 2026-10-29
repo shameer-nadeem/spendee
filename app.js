@@ -1,3 +1,4 @@
+import { parseEntry } from './parser.js';
 import { add, update, remove, list, getSetting, setSetting } from './db.js';
 import { CATEGORIES, getBalance, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, getOwedByFriend, settle, getMonths, getMonthStats, getTotalOwed, monthOf } from './logic.js';
 
@@ -134,10 +135,51 @@ function resetForm() {
   $('date').value = today();
   $('split-on').checked = false;
   $('rows').textContent = '';
+  $('quick').value = '';
+  $('parsed').hidden = true;
   cat = null;
   drawChips();
   drawSplit();
 }
+
+function fillForm(p) {
+  $('amount').value = p.amount;
+  $('note').value = p.note;
+  cat = p.category;
+  $('split-on').checked = p.friends.length > 0;
+  drawChips();
+  drawSplit();
+  p.friends.forEach((f, i) => {
+    if (i) addRow();
+    const r = $('rows').children[i];
+    r.querySelector('.name').value = f.name;
+    r.querySelector('.amt').value = f.amount;
+  });
+  updateReal();
+}
+
+$('quick-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const text = $('quick').value.trim();
+  if (!text) return;
+  const p = parseEntry(text);
+  const box = $('parsed');
+  if (p.error) {
+    box.textContent = p.error + '. Try: lunch 6000 Ali 2000';
+    box.classList.add('bad');
+    box.hidden = false;
+    return;
+  }
+  resetForm();
+  $('quick').value = text;
+  fillForm(p);
+  const lines = [money(p.amount) + ' \u00b7 ' + p.category + (p.note ? ' \u00b7 ' + p.note : '')];
+  if (p.friends.length) lines.push(p.friends.map(f => (f.name || 'Friend?') + ' ' + money(f.amount)).join(' \u00b7 '));
+  lines.push('Check the form below, then tap Save.');
+  box.textContent = lines.join('\n');
+  box.classList.remove('bad');
+  box.hidden = false;
+});
 
 $('split-on').addEventListener('change', drawSplit);
 $('add-friend').addEventListener('click', addRow);
