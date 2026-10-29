@@ -1,6 +1,6 @@
 import { parseEntry } from './parser.js';
-import { add, update, remove, list, getSetting, setSetting } from './db.js';
-import { CATEGORIES, getBalance, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, getOwedByFriend, settle, getMonths, getMonthStats, getTotalOwed, monthOf } from './logic.js';
+import { add, update, remove, list, getSetting, setSetting, readAll, replaceAll } from './db.js';
+import { CATEGORIES, getBalance, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, getOwedByFriend, settle, getMonths, getMonthStats, getTotalOwed, monthOf, buildBackup, parseBackup, daysSince, needsBackup } from './logic.js';
 
 const $ = id => document.getElementById(id);
 const tabs = document.querySelectorAll('#tabs button');
@@ -463,8 +463,60 @@ $('month').addEventListener('change', e => {
   drawDashboard();
 });
 
+async function drawBackup() {
+  const last = await getSetting('lastBackup', null);
+  const has = (await list('transactions')).length > 0;
+  const now = new Date().toISOString();
+  const days = last ? daysSince(last, now) : null;
+  $('last-backup').textContent = last
+    ? 'Last backup: ' + new Date(last).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + (days ? ' (' + days + ' days ago)' : ' (today)')
+    : 'Last backup: never';
+  const warn = $('backup-warn');
+  warn.hidden = !needsBackup(last, now, has);
+  warn.textContent = last ? 'Last backup was ' + days + ' days ago. Tap to back up.' : 'You have not backed up yet. Tap to back up.';
+}
+
+$('backup-warn').addEventListener('click', () => show('history'));
+
+$('export').addEventListener('click', async () => {
+  const now = new Date().toISOString();
+  const text = JSON.stringify(buildBackup(await readAll(), now), null, 2);
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'spendee-backup-' + today() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  await setSetting('lastBackup', now);
+  await drawBackup();
+  toast('Backup exported');
+});
+
+$('import-btn').addEventListener('click', () => $('import-file').click());
+
+$('import-file').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  let data;
+  try {
+    data = parseBackup(await file.text());
+  } catch (err) {
+    return toast(err.message);
+  }
+  const msg = 'Replace ALL current data with this backup (' + data.transactions.length + ' entries)? This cannot be undone.';
+  if (!confirm(msg)) return;
+  await replaceAll(data);
+  resetForm();
+  friend = null;
+  await renderAll();
+  toast('Backup restored');
+});
+
 async function renderAll() {
-  await Promise.all([refreshBalance(), loadFriends(), drawOwed(), drawHistory(), drawDashboard()]);
+  await Promise.all([refreshBalance(), loadFriends(), drawOwed(), drawHistory(), drawDashboard(), drawBackup()]);
 }
 
 async function init() {

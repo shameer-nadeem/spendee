@@ -86,3 +86,43 @@ export function getMonthStats(txs, splits, month) {
     .map(([cat, amount]) => ({ cat, amount, pct: Math.round((amount * 100) / spend) }));
   return { earned, spend, cats, top: cats.slice(0, 3) };
 }
+
+export function buildBackup(data, now) {
+  return {
+    app: 'spendee',
+    version: 1,
+    exportedAt: now,
+    settings: data.settings.filter(s => s.key !== 'lastBackup'),
+    transactions: data.transactions,
+    splits: data.splits
+  };
+}
+
+export function parseBackup(text) {
+  let b;
+  try {
+    b = JSON.parse(text);
+  } catch {
+    throw new Error('Not a valid backup file');
+  }
+  if (!b || b.app !== 'spendee') throw new Error('Not a Spendee backup');
+  if (!Array.isArray(b.transactions) || !Array.isArray(b.splits) || !Array.isArray(b.settings)) {
+    throw new Error('Backup is missing data');
+  }
+  const whole = n => Number.isInteger(n) && n > 0;
+  const badTx = b.transactions.find(t => !Number.isInteger(t.id) || !whole(t.amount) || !CATEGORIES.includes(t.category) || typeof t.date !== 'string');
+  if (badTx) throw new Error('Backup has a bad transaction');
+  const badSplit = b.splits.find(s => !Number.isInteger(s.id) || !Number.isInteger(s.txId) || typeof s.friend !== 'string' || !whole(s.amount) || typeof s.settled !== 'boolean');
+  if (badSplit) throw new Error('Backup has a bad friend entry');
+  if (b.settings.some(s => typeof s.key !== 'string')) throw new Error('Backup has bad settings');
+  return { settings: b.settings, transactions: b.transactions, splits: b.splits, exportedAt: b.exportedAt || '' };
+}
+
+export function daysSince(iso, now) {
+  return Math.floor((Date.parse(now) - Date.parse(iso)) / 86400000);
+}
+
+export function needsBackup(last, now, hasData) {
+  if (!hasData) return false;
+  return !last || daysSince(last, now) > 14;
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { parseEntry } from './parser.js';
-import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, settle, monthOf, getMonths, getTotalOwed, getMonthStats } from './logic.js';
+import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, settle, monthOf, getMonths, getTotalOwed, getMonthStats, buildBackup, parseBackup, daysSince, needsBackup } from './logic.js';
 
 let passed = 0;
 
@@ -271,6 +271,64 @@ test('parser: friend amount with no name keeps an empty name', () => {
 test('parser: custom keyword rules are used', () => {
   assert.equal(parseEntry('chai 100', { Coffee: ['chai'] }).category, 'Coffee');
   assert.equal(parseEntry('chai 100').category, 'Others');
+});
+
+const sample = {
+  settings: [{ key: 'startBalance', value: 10000 }, { key: 'lastBackup', value: '2026-10-01T00:00:00.000Z' }],
+  transactions: [
+    { id: 1, amount: 6000, note: 'lunch', category: 'Food', date: '2026-10-05', createdAt: 111 },
+    { id: 2, amount: 50000, note: '', category: 'Earning', date: '2026-10-06', createdAt: 222 }
+  ],
+  splits: [
+    { id: 1, txId: 1, friend: 'Ali', amount: 2000, settled: true, settledDate: '2026-10-07', date: '2026-10-05' },
+    { id: 2, txId: 1, friend: 'Hamza', amount: 2500, settled: false, settledDate: null, date: '2026-10-05' }
+  ]
+};
+
+test('backup: export then import gives identical data', () => {
+  const text = JSON.stringify(buildBackup(sample, '2026-10-29T10:00:00.000Z'));
+  const back = parseBackup(text);
+  assert.deepEqual(back.transactions, sample.transactions);
+  assert.deepEqual(back.splits, sample.splits);
+  assert.deepEqual(back.settings, [{ key: 'startBalance', value: 10000 }]);
+  assert.equal(back.exportedAt, '2026-10-29T10:00:00.000Z');
+});
+
+test('backup: balance and owed are the same after a round trip', () => {
+  const back = parseBackup(JSON.stringify(buildBackup(sample, '2026-10-29T10:00:00.000Z')));
+  assert.equal(getBalance(10000, back.transactions, back.splits), getBalance(10000, sample.transactions, sample.splits));
+  assert.deepEqual(getOwedByFriend(back.splits), { Hamza: 2500 });
+});
+
+test('backup: lastBackup setting is not stored in the file', () => {
+  const b = buildBackup(sample, '2026-10-29T10:00:00.000Z');
+  assert.equal(b.settings.some(x => x.key === 'lastBackup'), false);
+});
+
+test('backup: bad files are rejected', () => {
+  assert.throws(() => parseBackup('not json'), /valid backup/);
+  assert.throws(() => parseBackup('{"app":"other"}'), /Not a Spendee/);
+  assert.throws(() => parseBackup('{"app":"spendee","transactions":[]}'), /missing/);
+  const bad = b => JSON.stringify({ app: 'spendee', settings: [], transactions: [], splits: [], ...b });
+  assert.throws(() => parseBackup(bad({ transactions: [{ id: 1, amount: -5, category: 'Food', date: 'x' }] })), /transaction/);
+  assert.throws(() => parseBackup(bad({ transactions: [{ id: 1, amount: 5, category: 'Pets', date: 'x' }] })), /transaction/);
+  assert.throws(() => parseBackup(bad({ splits: [{ id: 1, txId: 1, friend: 'Ali', amount: 5 }] })), /friend/);
+});
+
+test('backup: empty data round trips', () => {
+  const back = parseBackup(JSON.stringify(buildBackup({ settings: [], transactions: [], splits: [] }, 'x')));
+  assert.deepEqual(back.transactions, []);
+  assert.deepEqual(back.splits, []);
+});
+
+test('needsBackup: reminder only when data exists and last backup is over 14 days', () => {
+  const now = '2026-10-29T12:00:00.000Z';
+  assert.equal(needsBackup(null, now, true), true);
+  assert.equal(needsBackup(null, now, false), false);
+  assert.equal(needsBackup('2026-10-25T12:00:00.000Z', now, true), false);
+  assert.equal(needsBackup('2026-10-15T12:00:00.000Z', now, true), false);
+  assert.equal(needsBackup('2026-10-14T12:00:00.000Z', now, true), true);
+  assert.equal(daysSince('2026-10-19T12:00:00.000Z', now), 10);
 });
 
 console.log('\n' + passed + ' tests passed');

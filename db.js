@@ -40,3 +40,24 @@ export async function getSetting(key, fallback = null) {
 }
 
 export const setSetting = (key, value) => update('settings', { key, value });
+
+export async function readAll() {
+  const [settings, transactions, splits] = await Promise.all([list('settings'), list('transactions'), list('splits')]);
+  return { settings, transactions, splits };
+}
+
+export async function replaceAll(data) {
+  const db = await open();
+  const last = await get('settings', 'lastBackup');
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(['transactions', 'splits', 'settings'], 'readwrite');
+    ['transactions', 'splits', 'settings'].forEach(n => t.objectStore(n).clear());
+    data.transactions.forEach(x => t.objectStore('transactions').put(x));
+    data.splits.forEach(x => t.objectStore('splits').put(x));
+    data.settings.forEach(x => t.objectStore('settings').put(x));
+    if (last) t.objectStore('settings').put(last);
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error);
+  });
+}

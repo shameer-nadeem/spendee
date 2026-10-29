@@ -16,6 +16,7 @@
       <span class="label">Balance</span>
       <strong id="balance">Rs 0</strong>
     </div>
+    <button type="button" id="backup-warn" class="warn" hidden></button>
     <form id="quick-form" class="quick" autocomplete="off">
       <label for="quick">Quick entry</label>
       <div class="quick-row">
@@ -64,7 +65,15 @@
     <ol id="top" class="top"></ol>
   </section>
   <section id="owed" class="screen"><h1>Owed</h1><div id="owed-body"></div></section>
-  <section id="history" class="screen"><h1>History</h1><div id="filter" class="chips"></div><div id="hist-list"></div></section>
+  <section id="history" class="screen"><h1>History</h1><div id="filter" class="chips"></div><div id="hist-list"></div>
+    <div class="card backup">
+      <h2>Backup</h2>
+      <p id="last-backup" class="sum"></p>
+      <button type="button" id="export" class="primary">Export backup</button>
+      <button type="button" id="import-btn" class="ghost">Import backup</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+    </div>
+  </section>
 </main>
 <nav id="tabs">
   <button data-tab="add" class="active">Add</button>

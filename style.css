@@ -289,3 +289,21 @@ h2 { margin: 24px 0 10px; font-size: 16px; color: var(--muted); font-weight: 600
 .quick-row .small { min-width: 64px; }
 .parsed { margin: 10px 0 0; padding: 12px 14px; background: var(--card); border-left: 3px solid var(--accent); border-radius: 8px; white-space: pre-line; line-height: 1.5; font-size: 15px; }
 .parsed.bad { border-left-color: #f87171; color: #f87171; }
+
+.warn {
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: none;
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  color: #fbbf24;
+  font-size: 15px;
+  text-align: left;
+}
+
+.backup { margin-top: 24px; }
+.backup h2 { margin-top: 0; }
+.backup .primary { margin-top: 0; }
+.backup .ghost { margin-top: 12px; }
