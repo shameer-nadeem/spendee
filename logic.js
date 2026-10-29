@@ -58,3 +58,31 @@ export function getPendingItems(splits, friend) {
 export function settle(split, date) {
   return { ...split, settled: true, settledDate: date };
 }
+
+export const monthOf = date => date.slice(0, 7);
+
+export function getMonths(txs, now) {
+  const set = new Set(txs.map(t => monthOf(t.date)));
+  set.add(now);
+  return [...set].sort().reverse();
+}
+
+export function getTotalOwed(txs, splits) {
+  const ids = new Set(txs.map(t => t.id));
+  return sum(splits.filter(s => !s.settled && ids.has(s.txId)));
+}
+
+export function getMonthStats(txs, splits, month) {
+  const inMonth = txs.filter(t => monthOf(t.date) === month);
+  const earned = sum(inMonth.filter(t => t.category === 'Earning'));
+  const spend = getRealSpend(inMonth, splits);
+  const by = {};
+  inMonth.forEach(t => {
+    const r = getTxRealSpend(t, splits);
+    if (r > 0) by[t.category] = (by[t.category] || 0) + r;
+  });
+  const cats = Object.entries(by)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, amount]) => ({ cat, amount, pct: Math.round((amount * 100) / spend) }));
+  return { earned, spend, cats, top: cats.slice(0, 3) };
+}

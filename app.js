@@ -1,5 +1,5 @@
 import { add, update, remove, list, getSetting, setSetting } from './db.js';
-import { CATEGORIES, getBalance, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, getOwedByFriend, settle } from './logic.js';
+import { CATEGORIES, getBalance, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, getOwedByFriend, settle, getMonths, getMonthStats, getTotalOwed, monthOf } from './logic.js';
 
 const $ = id => document.getElementById(id);
 const tabs = document.querySelectorAll('#tabs button');
@@ -10,6 +10,7 @@ let friend = null;
 let filterCat = 'All';
 let editing = null;
 let editCat = null;
+let month = null;
 let toastTimer;
 
 function show(name) {
@@ -352,8 +353,76 @@ $('e-del').addEventListener('click', async () => {
   toast('Deleted');
 });
 
+function monthLabel(m) {
+  const [y, n] = m.split('-').map(Number);
+  return new Date(y, n - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+async function drawDashboard() {
+  const [txs, splits, start] = await Promise.all([list('transactions'), list('splits'), getSetting('startBalance', 0)]);
+  const months = getMonths(txs, monthOf(today()));
+  if (!month || !months.includes(month)) month = months[0];
+  const sel = $('month');
+  sel.textContent = '';
+  months.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = monthLabel(m);
+    o.selected = m === month;
+    sel.appendChild(o);
+  });
+  const st = getMonthStats(txs, splits, month);
+  $('d-balance').textContent = money(getBalance(start, txs, splits));
+  $('d-earned').textContent = money(st.earned);
+  $('d-spend').textContent = money(st.spend);
+  $('d-owed').textContent = money(getTotalOwed(txs, splits));
+
+  const bars = $('bars');
+  bars.textContent = '';
+  if (!st.cats.length) {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = 'No spending this month.';
+    bars.appendChild(p);
+  }
+  st.cats.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'bar';
+    const head = document.createElement('div');
+    head.className = 'bar-head';
+    const name = document.createElement('span');
+    name.textContent = c.cat;
+    const val = document.createElement('span');
+    val.className = 'bar-val';
+    val.textContent = money(c.amount) + ' \u00b7 ' + c.pct + '%';
+    head.append(name, val);
+    const track = document.createElement('div');
+    track.className = 'track';
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.width = c.pct + '%';
+    track.appendChild(fill);
+    item.append(head, track);
+    bars.appendChild(item);
+  });
+
+  const top = $('top');
+  top.textContent = '';
+  st.top.forEach(c => {
+    const li = document.createElement('li');
+    li.textContent = c.cat + ' \u2013 ' + money(c.amount) + ' (' + c.pct + '%)';
+    top.appendChild(li);
+  });
+  $('top').previousElementSibling.hidden = !st.top.length;
+}
+
+$('month').addEventListener('change', e => {
+  month = e.target.value;
+  drawDashboard();
+});
+
 async function renderAll() {
-  await Promise.all([refreshBalance(), loadFriends(), drawOwed(), drawHistory()]);
+  await Promise.all([refreshBalance(), loadFriends(), drawOwed(), drawHistory(), drawDashboard()]);
 }
 
 async function init() {

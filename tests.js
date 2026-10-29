@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, settle } from './logic.js';
+import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, settle, monthOf, getMonths, getTotalOwed, getMonthStats } from './logic.js';
 
 let passed = 0;
 
@@ -142,6 +142,61 @@ test('deleting a transaction and its splits restores the balance', () => {
   const left = paid.filter(s => s.txId !== lunch.id);
   assert.equal(getBalance(10000, [], left), 10000);
   assert.deepEqual(getOwedByFriend(left), {});
+});
+
+const oct = [
+  { id: 1, amount: 6000, category: 'Food', date: '2026-10-05' },
+  { id: 2, amount: 1000, category: 'Coffee', date: '2026-10-09' },
+  { id: 3, amount: 2000, category: 'Transport', date: '2026-10-12' },
+  { id: 4, amount: 50000, category: 'Earning', date: '2026-10-20' },
+  { id: 5, amount: 9000, category: 'Payments', date: '2026-09-28' }
+];
+
+test('month stats: earning is not spend, lunch counts as real spend 1500', () => {
+  const m = getMonthStats(oct, splits, '2026-10');
+  assert.equal(m.earned, 50000);
+  assert.equal(m.spend, 1500 + 1000 + 2000);
+});
+
+test('month stats: categories sorted with percentages, no Earning', () => {
+  const m = getMonthStats(oct, splits, '2026-10');
+  assert.deepEqual(m.cats.map(c => c.cat), ['Transport', 'Food', 'Coffee']);
+  assert.deepEqual(m.cats.map(c => c.pct), [44, 33, 22]);
+  assert.equal(m.cats.some(c => c.cat === 'Earning'), false);
+});
+
+test('month stats: top 3 keeps only the biggest three', () => {
+  const more = [...oct, { id: 6, amount: 300, category: 'Others', date: '2026-10-15' }];
+  const m = getMonthStats(more, splits, '2026-10');
+  assert.equal(m.cats.length, 4);
+  assert.deepEqual(m.top.map(c => c.cat), ['Transport', 'Food', 'Coffee']);
+});
+
+test('month stats: other months are left out', () => {
+  const m = getMonthStats(oct, splits, '2026-09');
+  assert.equal(m.spend, 9000);
+  assert.equal(m.earned, 0);
+  assert.deepEqual(getMonthStats(oct, splits, '2026-08').cats, []);
+});
+
+test('month stats: a fully split bill leaves no real spend', () => {
+  const tx = [{ id: 1, amount: 1000, category: 'Food', date: '2026-10-01' }];
+  const sp = [{ id: 1, txId: 1, friend: 'Ali', amount: 1000, settled: false }];
+  const m = getMonthStats(tx, sp, '2026-10');
+  assert.equal(m.spend, 0);
+  assert.deepEqual(m.cats, []);
+});
+
+test('getMonths lists months newest first and always has the current one', () => {
+  assert.deepEqual(getMonths(oct, '2026-10'), ['2026-10', '2026-09']);
+  assert.deepEqual(getMonths([], '2026-11'), ['2026-11']);
+  assert.equal(monthOf('2026-10-05'), '2026-10');
+});
+
+test('getTotalOwed adds up pending money only', () => {
+  const sp = [...splits, { id: 9, txId: 1, friend: 'Sara', amount: 100, settled: true }];
+  assert.equal(getTotalOwed([lunch], sp), 4500);
+  assert.equal(getTotalOwed([], sp), 0);
 });
 
 console.log('\n' + passed + ' tests passed');

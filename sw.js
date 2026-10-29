@@ -1,4 +1,4 @@
-const CACHE = 'spendee-v5';
+const CACHE = 'spendee-v6';
 const FILES = [
   './',
   './index.html',
