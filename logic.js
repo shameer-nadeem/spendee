@@ -42,3 +42,19 @@ export function matchName(name, known) {
   const hit = known.find(k => k.toLowerCase() === name.toLowerCase());
   return hit || name;
 }
+
+export function sortNewest(txs) {
+  return [...txs].sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+export function filterByCategory(txs, cat) {
+  return cat === 'All' ? txs : txs.filter(t => t.category === cat);
+}
+
+export function getPendingItems(splits, friend) {
+  return splits.filter(s => !s.settled && s.friend === friend);
+}
+
+export function settle(split, date) {
+  return { ...split, settled: true, settledDate: date };
+}

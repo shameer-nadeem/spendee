@@ -38,8 +38,8 @@
     </form>
   </section>
   <section id="dashboard" class="screen"><h1>Dashboard</h1></section>
-  <section id="owed" class="screen"><h1>Owed</h1></section>
-  <section id="history" class="screen"><h1>History</h1></section>
+  <section id="owed" class="screen"><h1>Owed</h1><div id="owed-body"></div></section>
+  <section id="history" class="screen"><h1>History</h1><div id="filter" class="chips"></div><div id="hist-list"></div></section>
 </main>
 <nav id="tabs">
   <button data-tab="add" class="active">Add</button>
@@ -54,6 +54,23 @@
     <label for="start">Your starting balance (PKR)</label>
     <input id="start" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">
     <button type="submit" class="primary">Start</button>
+  </form>
+</div>
+<div id="edit" class="sheet" hidden>
+  <form id="edit-form" autocomplete="off">
+    <h1>Edit entry</h1>
+    <label for="e-amount">Amount (PKR)</label>
+    <input id="e-amount" type="text" inputmode="numeric" pattern="[0-9]*">
+    <label for="e-note">Note</label>
+    <input id="e-note" type="text">
+    <label>Category</label>
+    <div id="e-chips" class="chips"></div>
+    <label for="e-date">Date</label>
+    <input id="e-date" type="date">
+    <div id="e-splits" class="e-splits"></div>
+    <button type="submit" class="primary">Save changes</button>
+    <button type="button" id="e-del" class="danger">Delete</button>
+    <button type="button" id="e-cancel" class="ghost">Cancel</button>
   </form>
 </div>
 <script type="module" src="app.js"></script>

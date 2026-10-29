@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName } from './logic.js';
+import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, settle } from './logic.js';
 
 let passed = 0;
 
@@ -104,6 +104,44 @@ test('checkSplits: missing name or amount is blocked', () => {
 test('matchName reuses the known spelling', () => {
   assert.equal(matchName('ali', ['Ali', 'Hamza']), 'Ali');
   assert.equal(matchName('Sara', ['Ali']), 'Sara');
+});
+
+test('settle marks paid with a date and raises balance by the split', () => {
+  const done = settle(splits[0], '2026-10-31');
+  assert.equal(done.settled, true);
+  assert.equal(done.settledDate, '2026-10-31');
+  assert.equal(splits[0].settled, false);
+  assert.equal(getBalance(10000, [lunch], [done, splits[1]]), 6000);
+});
+
+test('getPendingItems returns only unsettled items of one friend', () => {
+  const all = [...splits, { id: 3, txId: 2, friend: 'Ali', amount: 300, settled: true }];
+  const items = getPendingItems(all, 'Ali');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].amount, 2000);
+});
+
+test('sortNewest puts the latest date first, then latest created', () => {
+  const list = [
+    { id: 1, date: '2026-10-01', createdAt: 1 },
+    { id: 2, date: '2026-10-05', createdAt: 2 },
+    { id: 3, date: '2026-10-05', createdAt: 3 }
+  ];
+  assert.deepEqual(sortNewest(list).map(t => t.id), [3, 2, 1]);
+});
+
+test('filterByCategory filters and All keeps everything', () => {
+  const list = [{ category: 'Food' }, { category: 'Coffee' }, { category: 'Food' }];
+  assert.equal(filterByCategory(list, 'Food').length, 2);
+  assert.equal(filterByCategory(list, 'All').length, 3);
+});
+
+test('deleting a transaction and its splits restores the balance', () => {
+  const paid = [settle(splits[0], '2026-10-31'), splits[1]];
+  assert.equal(getBalance(10000, [lunch], paid), 6000);
+  const left = paid.filter(s => s.txId !== lunch.id);
+  assert.equal(getBalance(10000, [], left), 10000);
+  assert.deepEqual(getOwedByFriend(left), {});
 });
 
 console.log('\n' + passed + ' tests passed');

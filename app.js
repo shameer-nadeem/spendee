@@ -1,16 +1,22 @@
-import { add, list, getSetting, setSetting } from './db.js';
-import { CATEGORIES, getBalance, checkSplits, matchName } from './logic.js';
+import { add, update, remove, list, getSetting, setSetting } from './db.js';
+import { CATEGORIES, getBalance, checkSplits, matchName, sortNewest, filterByCategory, getPendingItems, getOwedByFriend, settle } from './logic.js';
 
 const $ = id => document.getElementById(id);
 const tabs = document.querySelectorAll('#tabs button');
 const screens = document.querySelectorAll('.screen');
 let cat = null;
 let known = [];
+let friend = null;
+let filterCat = 'All';
+let editing = null;
+let editCat = null;
 let toastTimer;
 
 function show(name) {
   tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   screens.forEach(s => s.classList.toggle('active', s.id === name));
+  if (name === 'owed') friend = null;
+  renderAll();
 }
 
 tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.tab)));
@@ -33,20 +39,23 @@ async function refreshBalance() {
   $('balance').textContent = money(getBalance(start, txs, splits));
 }
 
-function drawChips() {
-  const box = $('chips');
+function chipRow(box, items, selected, pick) {
   box.textContent = '';
-  CATEGORIES.forEach(c => {
+  items.forEach(c => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'chip' + (c === cat ? ' on' : '');
+    b.className = 'chip' + (c === selected ? ' on' : '');
     b.textContent = c;
-    b.addEventListener('click', () => {
-      cat = c;
-      drawChips();
-      drawSplit();
-    });
+    b.addEventListener('click', () => pick(c));
     box.appendChild(b);
+  });
+}
+
+function drawChips() {
+  chipRow($('chips'), CATEGORIES, cat, c => {
+    cat = c;
+    drawChips();
+    drawSplit();
   });
 }
 
@@ -160,8 +169,7 @@ $('form').addEventListener('submit', async e => {
     });
   }
   resetForm();
-  await loadFriends();
-  await refreshBalance();
+  await renderAll();
   toast('Saved');
 });
 
@@ -175,12 +183,184 @@ $('setup-form').addEventListener('submit', async e => {
   await refreshBalance();
 });
 
+const row = (title, sub, val, cls) => {
+  const el = document.createElement('div');
+  el.className = 'item';
+  const main = document.createElement('div');
+  main.className = 'main';
+  const t = document.createElement('div');
+  t.className = 'title';
+  t.textContent = title;
+  const u = document.createElement('div');
+  u.className = 'sub';
+  u.textContent = sub;
+  main.append(t, u);
+  el.appendChild(main);
+  if (val) {
+    const v = document.createElement('div');
+    v.className = 'val ' + (cls || '');
+    v.textContent = val;
+    el.appendChild(v);
+  }
+  return el;
+};
+
+const asButton = el => {
+  const b = document.createElement('button');
+  b.className = el.className;
+  b.append(...el.childNodes);
+  return b;
+};
+
+async function drawOwed() {
+  const body = $('owed-body');
+  body.textContent = '';
+  const [txs, splits] = await Promise.all([list('transactions'), list('splits')]);
+  const byId = new Map(txs.map(t => [t.id, t]));
+  const live = splits.filter(sp => byId.has(sp.txId));
+  const owed = getOwedByFriend(live);
+  if (friend && !owed[friend]) friend = null;
+
+  if (!friend) {
+    const names = Object.keys(owed).sort();
+    if (!names.length) {
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = 'Nobody owes you anything.';
+      body.appendChild(p);
+    }
+    names.forEach(n => {
+      const b = asButton(row(n, 'Tap to see items', money(owed[n])));
+      b.addEventListener('click', () => {
+        friend = n;
+        drawOwed();
+      });
+      body.appendChild(b);
+    });
+    return;
+  }
+
+  const back = document.createElement('button');
+  back.className = 'back';
+  back.textContent = '\u2039 Back';
+  back.addEventListener('click', () => {
+    friend = null;
+    drawOwed();
+  });
+  const sum = document.createElement('p');
+  sum.className = 'sum';
+  sum.textContent = friend + ' owes you ' + money(owed[friend]);
+  body.append(back, sum);
+
+  getPendingItems(live, friend).forEach(sp => {
+    const tx = byId.get(sp.txId);
+    const el = row(tx.note || tx.category, tx.date + ' \u00b7 ' + tx.category, money(sp.amount));
+    const btn = document.createElement('button');
+    btn.className = 'small';
+    btn.textContent = 'Mark paid';
+    btn.addEventListener('click', async () => {
+      await update('splits', settle(sp, today()));
+      await renderAll();
+      toast('Marked paid');
+    });
+    el.appendChild(btn);
+    body.appendChild(el);
+  });
+}
+
+async function drawHistory() {
+  chipRow($('filter'), ['All', ...CATEGORIES], filterCat, c => {
+    filterCat = c;
+    drawHistory();
+  });
+  const box = $('hist-list');
+  box.textContent = '';
+  const txs = sortNewest(filterByCategory(await list('transactions'), filterCat));
+  if (!txs.length) {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = 'Nothing here yet.';
+    box.appendChild(p);
+  }
+  txs.forEach(tx => {
+    const earn = tx.category === 'Earning';
+    const b = asButton(row(
+      tx.note || tx.category,
+      tx.date + ' \u00b7 ' + tx.category,
+      (earn ? '+' : '-') + money(tx.amount),
+      earn ? 'in' : ''
+    ));
+    b.addEventListener('click', () => openEdit(tx));
+    box.appendChild(b);
+  });
+}
+
+async function openEdit(tx) {
+  editing = tx;
+  editCat = tx.category;
+  $('e-amount').value = tx.amount;
+  $('e-note').value = tx.note;
+  $('e-date').value = tx.date;
+  const sp = (await list('splits')).filter(x => x.txId === tx.id);
+  $('e-splits').textContent = sp.map(x => x.friend + ' owes ' + money(x.amount) + (x.settled ? ' (paid)' : ' (pending)')).join('\n');
+  $('e-splits').style.whiteSpace = 'pre-line';
+  drawEditChips();
+  $('edit').hidden = false;
+}
+
+function drawEditChips() {
+  chipRow($('e-chips'), CATEGORIES, editCat, c => {
+    editCat = c;
+    drawEditChips();
+  });
+}
+
+function closeEdit() {
+  $('edit').hidden = true;
+  editing = null;
+}
+
+$('e-cancel').addEventListener('click', closeEdit);
+
+$('edit-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const amount = toNum($('e-amount').value);
+  if (!amount) return toast('Enter an amount');
+  const sp = (await list('splits')).filter(x => x.txId === editing.id);
+  if (sp.length && editCat === 'Earning') return toast('Delete this entry to make it Earning');
+  const check = checkSplits(amount, sp.map(x => ({ name: x.friend, amount: x.amount })));
+  if (!check.ok) return toast('Friends owe more than the total');
+  await update('transactions', {
+    ...editing,
+    amount,
+    note: $('e-note').value.trim(),
+    category: editCat,
+    date: $('e-date').value || editing.date
+  });
+  closeEdit();
+  await renderAll();
+  toast('Updated');
+});
+
+$('e-del').addEventListener('click', async () => {
+  if (!confirm('Delete this entry? Its friend entries will be removed too.')) return;
+  const sp = (await list('splits')).filter(x => x.txId === editing.id);
+  for (const x of sp) await remove('splits', x.id);
+  await remove('transactions', editing.id);
+  closeEdit();
+  await renderAll();
+  toast('Deleted');
+});
+
+async function renderAll() {
+  await Promise.all([refreshBalance(), loadFriends(), drawOwed(), drawHistory()]);
+}
+
 async function init() {
   resetForm();
-  await loadFriends();
   const start = await getSetting('startBalance', null);
   if (start === null) $('setup').hidden = false;
-  else await refreshBalance();
+  await renderAll();
 }
 
 init();
