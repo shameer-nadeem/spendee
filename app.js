@@ -1,10 +1,11 @@
 import { add, list, getSetting, setSetting } from './db.js';
-import { CATEGORIES, getBalance } from './logic.js';
+import { CATEGORIES, getBalance, checkSplits, matchName } from './logic.js';
 
 const $ = id => document.getElementById(id);
 const tabs = document.querySelectorAll('#tabs button');
 const screens = document.querySelectorAll('.screen');
 let cat = null;
+let known = [];
 let toastTimer;
 
 function show(name) {
@@ -43,8 +44,77 @@ function drawChips() {
     b.addEventListener('click', () => {
       cat = c;
       drawChips();
+      drawSplit();
     });
     box.appendChild(b);
+  });
+}
+
+function addRow() {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const name = document.createElement('input');
+  name.className = 'name';
+  name.placeholder = 'Friend';
+  name.setAttribute('list', 'friends');
+  const amt = document.createElement('input');
+  amt.className = 'amt';
+  amt.placeholder = 'Owes';
+  amt.inputMode = 'numeric';
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'del';
+  del.textContent = '\u00d7';
+  del.addEventListener('click', () => {
+    row.remove();
+    updateReal();
+  });
+  row.append(name, amt, del);
+  row.addEventListener('input', updateReal);
+  $('rows').appendChild(row);
+}
+
+function readRows() {
+  return [...$('rows').children].map(r => ({
+    name: r.querySelector('.name').value.trim(),
+    amount: toNum(r.querySelector('.amt').value) || 0
+  }));
+}
+
+function splitOn() {
+  return $('split-on').checked && cat !== 'Earning';
+}
+
+function updateReal() {
+  const el = $('real');
+  const total = toNum($('amount').value) || 0;
+  if (!splitOn()) {
+    el.textContent = '';
+    return null;
+  }
+  const r = checkSplits(total, readRows());
+  const over = r.owed > total;
+  el.textContent = over ? 'Friends owe more than the total' : 'Your real spend: ' + money(r.real);
+  el.classList.toggle('bad', over);
+  return r;
+}
+
+function drawSplit() {
+  $('split-box').hidden = cat === 'Earning';
+  $('split-body').hidden = !splitOn();
+  if (splitOn() && !$('rows').children.length) addRow();
+  updateReal();
+}
+
+async function loadFriends() {
+  const splits = await list('splits');
+  known = [...new Set(splits.map(s => s.friend))];
+  const dl = $('friends');
+  dl.textContent = '';
+  known.forEach(k => {
+    const o = document.createElement('option');
+    o.value = k;
+    dl.appendChild(o);
   });
 }
 
@@ -52,23 +122,45 @@ function resetForm() {
   $('amount').value = '';
   $('note').value = '';
   $('date').value = today();
+  $('split-on').checked = false;
+  $('rows').textContent = '';
   cat = null;
   drawChips();
+  drawSplit();
 }
+
+$('split-on').addEventListener('change', drawSplit);
+$('add-friend').addEventListener('click', addRow);
+$('amount').addEventListener('input', updateReal);
 
 $('form').addEventListener('submit', async e => {
   e.preventDefault();
   const amount = toNum($('amount').value);
   if (!amount) return toast('Enter an amount');
   if (!cat) return toast('Pick a category');
-  await add('transactions', {
+  const rows = splitOn() ? readRows().filter(r => r.name || r.amount) : [];
+  const check = checkSplits(amount, rows);
+  if (!check.ok) return toast(check.error);
+  const date = $('date').value || today();
+  const txId = await add('transactions', {
     amount,
     note: $('note').value.trim(),
     category: cat,
-    date: $('date').value || today(),
+    date,
     createdAt: Date.now()
   });
+  for (const r of rows) {
+    await add('splits', {
+      txId,
+      friend: matchName(r.name, known),
+      amount: r.amount,
+      settled: false,
+      settledDate: null,
+      date
+    });
+  }
   resetForm();
+  await loadFriends();
   await refreshBalance();
   toast('Saved');
 });
@@ -85,6 +177,7 @@ $('setup-form').addEventListener('submit', async e => {
 
 async function init() {
   resetForm();
+  await loadFriends();
   const start = await getSetting('startBalance', null);
   if (start === null) $('setup').hidden = false;
   else await refreshBalance();

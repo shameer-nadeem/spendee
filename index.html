@@ -25,6 +25,15 @@
       <div id="chips" class="chips"></div>
       <label for="date">Date</label>
       <input id="date" type="date">
+      <div id="split-box">
+        <label class="toggle"><input id="split-on" type="checkbox"> Split with friends</label>
+        <div id="split-body" hidden>
+          <div id="rows"></div>
+          <button type="button" id="add-friend" class="ghost">+ Add friend</button>
+          <p id="real" class="real"></p>
+        </div>
+      </div>
+      <datalist id="friends"></datalist>
       <button type="submit" class="primary">Save</button>
     </form>
   </section>

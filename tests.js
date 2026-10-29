@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend } from './logic.js';
+import { getBalance, getRealSpend, getTxRealSpend, getOwedByFriend, checkSplits, matchName } from './logic.js';
 
 let passed = 0;
 
@@ -70,6 +70,40 @@ test('empty data gives starting balance', () => {
   assert.equal(getBalance(5000, [], []), 5000);
   assert.equal(getRealSpend([], []), 0);
   assert.deepEqual(getOwedByFriend([]), {});
+});
+
+test('checkSplits: lunch example is valid with real spend 1500', () => {
+  const r = checkSplits(6000, [{ name: 'Ali', amount: 2000 }, { name: 'Hamza', amount: 2500 }]);
+  assert.equal(r.ok, true);
+  assert.equal(r.owed, 4500);
+  assert.equal(r.real, 1500);
+});
+
+test('checkSplits: friends owing more than total is blocked', () => {
+  const r = checkSplits(1000, [{ name: 'Ali', amount: 700 }, { name: 'Hamza', amount: 400 }]);
+  assert.equal(r.ok, false);
+});
+
+test('checkSplits: friends owing exactly the total is allowed', () => {
+  const r = checkSplits(1000, [{ name: 'Ali', amount: 1000 }]);
+  assert.equal(r.ok, true);
+  assert.equal(r.real, 0);
+});
+
+test('checkSplits: empty rows are ignored, no friends means real = total', () => {
+  const r = checkSplits(500, [{ name: '', amount: 0 }]);
+  assert.equal(r.ok, true);
+  assert.equal(r.real, 500);
+});
+
+test('checkSplits: missing name or amount is blocked', () => {
+  assert.equal(checkSplits(500, [{ name: '', amount: 100 }]).ok, false);
+  assert.equal(checkSplits(500, [{ name: 'Ali', amount: 0 }]).ok, false);
+});
+
+test('matchName reuses the known spelling', () => {
+  assert.equal(matchName('ali', ['Ali', 'Hamza']), 'Ali');
+  assert.equal(matchName('Sara', ['Ali']), 'Sara');
 });
 
 console.log('\n' + passed + ' tests passed');

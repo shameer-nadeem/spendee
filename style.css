@@ -133,3 +133,44 @@ input:focus { outline: 2px solid var(--accent); }
 
 .setup[hidden] { display: none; }
 .setup form { width: 100%; }
+
+#split-box { margin-top: 20px; }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.toggle input { width: 26px; min-height: 26px; height: 26px; accent-color: var(--accent); }
+
+.row { display: flex; gap: 8px; margin-bottom: 8px; }
+.row .name { flex: 1.4; min-width: 0; }
+.row .amt { flex: 1; min-width: 0; }
+
+.row .del {
+  width: 48px;
+  flex: none;
+  background: var(--card);
+  border: 1px solid #262a33;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.ghost {
+  width: 100%;
+  min-height: 48px;
+  background: none;
+  border: 1px dashed #3a3f4b;
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.real { margin: 14px 0 0; font-size: 18px; font-weight: 600; }
+.real.bad { color: #f87171; }

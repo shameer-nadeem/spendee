@@ -27,3 +27,18 @@ export function getOwedByFriend(splits) {
   });
   return out;
 }
+
+export function checkSplits(total, rows) {
+  const used = rows.filter(r => r.name || r.amount);
+  const owed = used.reduce((t, r) => t + (r.amount || 0), 0);
+  const real = total - owed;
+  if (used.some(r => !r.name)) return { ok: false, owed, real, error: 'Add a name for each friend' };
+  if (used.some(r => !r.amount)) return { ok: false, owed, real, error: 'Add an amount for each friend' };
+  if (owed > total) return { ok: false, owed, real, error: 'Friends owe more than the total' };
+  return { ok: true, owed, real, error: '' };
+}
+
+export function matchName(name, known) {
+  const hit = known.find(k => k.toLowerCase() === name.toLowerCase());
+  return hit || name;
+}
