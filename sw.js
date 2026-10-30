@@ -1,4 +1,4 @@
-const CACHE = 'spendee-v8';
+const CACHE = 'spendee-v9';
 const FILES = [
   './',
   './index.html',
@@ -8,7 +8,9 @@ const FILES = [
   './logic.js',
   './parser.js',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './apple-touch-icon.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', e => {
